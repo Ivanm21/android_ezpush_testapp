@@ -16,14 +16,19 @@
 
 package com.google.firebase.quickstart.fcm;
 
+import android.app.Notification;
 import android.app.NotificationManager;
 import android.app.PendingIntent;
 import android.content.Context;
 import android.content.Intent;
+import android.content.res.Resources;
+import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
 import android.media.RingtoneManager;
 import android.net.Uri;
 import android.support.v4.app.NotificationCompat;
 import android.util.Log;
+import android.graphics.Color;
 
 import com.firebase.jobdispatcher.Constraint;
 import com.firebase.jobdispatcher.FirebaseJobDispatcher;
@@ -31,6 +36,13 @@ import com.firebase.jobdispatcher.GooglePlayDriver;
 import com.firebase.jobdispatcher.Job;
 import com.google.firebase.messaging.FirebaseMessagingService;
 import com.google.firebase.messaging.RemoteMessage;
+
+import java.io.BufferedInputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.net.HttpURLConnection;
+import java.net.URL;
+import java.net.URLConnection;
 
 public class MyFirebaseMessagingService extends FirebaseMessagingService {
 
@@ -79,6 +91,26 @@ public class MyFirebaseMessagingService extends FirebaseMessagingService {
 
         // Also if you intend on generating your own notifications as a result of a received FCM
         // message, here is where that should be initiated. See sendNotification method below.
+
+        //message will contain the Push Message
+        String message = remoteMessage.getData().get("message");
+        //imageUri will contain URL of the image to be displayed with Notification
+        String iconUri = remoteMessage.getData().get("android_custom_icon");
+
+        String title = remoteMessage.getData().get("android_header");
+
+        String sound = remoteMessage.getData().get("android_sound");
+        String led = remoteMessage.getData().get("android_led");
+
+        String group = remoteMessage.getData().get("android_group");
+
+        String summary = remoteMessage.getData().get("android_summary");
+
+        String category = remoteMessage.getData().get("android_category");
+
+        Bitmap icon = loadBitmap(iconUri);
+
+        sendNotification(message, icon ,title,sound,led,group,summary,category);
     }
     // [END receive_message]
 
@@ -108,26 +140,102 @@ public class MyFirebaseMessagingService extends FirebaseMessagingService {
      *
      * @param messageBody FCM message body received.
      */
-    private void sendNotification(String messageBody) {
+    private void sendNotification(String messageBody, Bitmap icon, String title, String sound, String led, String group, String summary, String category) {
         Intent intent = new Intent(this, MainActivity.class);
         intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP);
         PendingIntent pendingIntent = PendingIntent.getActivity(this, 0 /* Request code */, intent,
                 PendingIntent.FLAG_ONE_SHOT);
 
+        Resources res = getResources();
+        Uri soundFile = null;
+        if(sound != null && !sound.isEmpty()) {
+            int soundId = res.getIdentifier(sound, "raw", getPackageName());
+            soundFile = Uri.parse("android.resource://" + getPackageName() + "/" + "R.raw/" + soundId);
+        }
+        else{
+            soundFile = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION);
+        }
+
         String channelId = getString(R.string.default_notification_channel_id);
-        Uri defaultSoundUri= RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION);
         NotificationCompat.Builder notificationBuilder =
                 new NotificationCompat.Builder(this, channelId)
+                        .setLargeIcon(icon)
                 .setSmallIcon(R.drawable.ic_stat_ic_notification)
-                .setContentTitle("FCM Message")
+                .setContentTitle(title)
                 .setContentText(messageBody)
-                .setAutoCancel(true)
-                .setSound(defaultSoundUri)
-                .setContentIntent(pendingIntent);
+                .setStyle(new NotificationCompat.BigTextStyle()
+                        .bigText(messageBody)
+                        .setSummaryText(summary))
+                .setSound(soundFile)
+                .setContentIntent(pendingIntent)
+                .setGroup(group)
+                .setAutoCancel(false)
+                .setCategory(category)
+                .setColorized(true)
+                .setColor(23741551)
+                //.setLights(Integer.getInteger(led),10, 15)
+                .setNumber(5);
+
+
+
+
 
         NotificationManager notificationManager =
                 (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
 
         notificationManager.notify(0 /* ID of notification */, notificationBuilder.build());
     }
+
+
+    public Bitmap loadBitmap(String url)
+    {
+        Bitmap bm = null;
+        InputStream is = null;
+        BufferedInputStream bis = null;
+        try
+        {
+            URLConnection conn = new URL(url).openConnection();
+            conn.connect();
+            is = conn.getInputStream();
+            bis = new BufferedInputStream(is, 8192);
+            bm = BitmapFactory.decodeStream(bis);
+        }
+        catch (Exception e)
+        {
+            e.printStackTrace();
+        }
+        finally {
+            if (bis != null)
+            {
+                try
+                {
+                    bis.close();
+                }
+                catch (IOException e)
+                {
+                    e.printStackTrace();
+                }
+            }
+            if (is != null)
+            {
+                try
+                {
+                    is.close();
+                }
+                catch (IOException e)
+                {
+                    e.printStackTrace();
+                }
+            }
+        }
+        return bm;
+    }
+
+    public static  Color hex2Rgb(String colorStr) {
+        return new Color(
+                Integer.valueOf( colorStr.substring( 1, 3 ), 16 ),
+                Integer.valueOf( colorStr.substring( 3, 5 ), 16 ),
+                Integer.valueOf( colorStr.substring( 5, 7 ), 16 ) );
+    }
+
 }
