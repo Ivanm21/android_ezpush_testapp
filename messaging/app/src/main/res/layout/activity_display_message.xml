@@ -6,4 +6,21 @@
     android:layout_height="match_parent"
     tools:context="com.google.firebase.quickstart.fcm.DisplayMessageActivity">
 
+    <TableLayout
+        android:id="@+id/data_table"
+        android:layout_width="360dp"
+        android:layout_height="464dp"
+        android:layout_marginEnd="8dp"
+        android:layout_marginLeft="12dp"
+        android:layout_marginStart="8dp"
+        android:layout_marginTop="8dp"
+        android:gravity="start|end"
+        android:orientation="vertical"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintLeft_toLeftOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent">
+
+    </TableLayout>
+
 </android.support.constraint.ConstraintLayout>

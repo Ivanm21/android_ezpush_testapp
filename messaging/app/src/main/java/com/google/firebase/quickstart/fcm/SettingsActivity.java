@@ -12,6 +12,7 @@ import android.os.Bundle;
 import android.preference.ListPreference;
 import android.preference.Preference;
 import android.preference.PreferenceActivity;
+import android.support.annotation.RequiresApi;
 import android.support.v7.app.ActionBar;
 import android.preference.PreferenceFragment;
 import android.preference.PreferenceManager;
@@ -167,6 +168,7 @@ public class SettingsActivity extends AppCompatPreferenceActivity {
      * This method stops fragment injection in malicious applications.
      * Make sure to deny any unknown fragments here.
      */
+    @RequiresApi(api = Build.VERSION_CODES.HONEYCOMB)
     protected boolean isValidFragment(String fragmentName) {
         return PreferenceFragment.class.getName().equals(fragmentName)
                 || GeneralPreferenceFragment.class.getName().equals(fragmentName)

@@ -16,19 +16,27 @@
 
 package com.google.firebase.quickstart.fcm;
 
+import android.app.ActivityManager;
+import android.app.AlertDialog;
 import android.app.Notification;
 import android.app.NotificationManager;
 import android.app.PendingIntent;
+import android.content.ComponentName;
 import android.content.Context;
+import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.res.Resources;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.media.RingtoneManager;
 import android.net.Uri;
+import android.os.Build;
+import android.os.Handler;
+import android.os.Looper;
 import android.support.v4.app.NotificationCompat;
 import android.util.Log;
 import android.graphics.Color;
+import android.widget.Toast;
 
 import com.firebase.jobdispatcher.Constraint;
 import com.firebase.jobdispatcher.FirebaseJobDispatcher;
@@ -37,17 +45,19 @@ import com.firebase.jobdispatcher.Job;
 import com.google.firebase.messaging.FirebaseMessagingService;
 import com.google.firebase.messaging.RemoteMessage;
 
+
 import java.io.BufferedInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.net.URLConnection;
+import java.util.List;
+import java.util.Map;
 
 public class MyFirebaseMessagingService extends FirebaseMessagingService {
 
     private static final String TAG = "MyFirebaseMsgService";
-
     /**
      * Called when message is received.
      *
@@ -73,6 +83,7 @@ public class MyFirebaseMessagingService extends FirebaseMessagingService {
         // Check if message contains a data payload.
         if (remoteMessage.getData().size() > 0) {
             Log.d(TAG, "Message data payload: " + remoteMessage.getData());
+            Log.d(TAG, "Message notification: " + remoteMessage.getNotification());
 
             if (/* Check if data needs to be processed by long running job */ true) {
                 // For long-running tasks (10 seconds or more) use Firebase Job Dispatcher.
@@ -100,23 +111,68 @@ public class MyFirebaseMessagingService extends FirebaseMessagingService {
         String title = remoteMessage.getData().get("android_header");
 
         String sound = remoteMessage.getData().get("android_sound");
+
+
         String led = remoteMessage.getData().get("android_led");
+        if(led ==null || !led.isEmpty()){
+            led = "1506db";
+        }
 
         String group = remoteMessage.getData().get("android_group");
+        if(group ==null || !group.isEmpty()){
+            group = "g1";
+        }
 
         String summary = remoteMessage.getData().get("android_summary");
+        if(summary ==null || !summary.isEmpty()){
+            summary = getPackageName();
+        }
 
         String category = remoteMessage.getData().get("android_category");
+        if(category ==null || !category.isEmpty()){
+            category = getPackageName();
+        }
+
+        String displayTypeDialog = remoteMessage.getData().get("pop_up_type");
+
+        String url = remoteMessage.getData().get("url");
+
+        String force_vibration = remoteMessage.getData().get("android_force_vibration");
+        Boolean forceVibrate = null;
+        if (force_vibration!=null && !force_vibration.isEmpty()){
+             forceVibrate = Boolean.valueOf(force_vibration);
+        }
 
         Bitmap icon = loadBitmap(iconUri);
 
-        sendNotification(message, icon ,title,sound,led,group,summary,category);
+        if ( !isAppIsInBackground(getApplicationContext())) {
+            if(displayTypeDialog.indexOf('1')>=0){
+                ShowMessage(remoteMessage);
+            }else{
+             postToastMessage(message);}
+
+        } else {
+            sendNotification(message, icon ,title,sound,led,group,summary,category,forceVibrate,url);
+
+        }
+
     }
     // [END receive_message]
 
     /**
      * Schedule a job using FirebaseJobDispatcher.
      */
+    public void postToastMessage(final String message) {
+        Handler handler = new Handler(Looper.getMainLooper());
+
+        handler.post(new Runnable() {
+
+            @Override
+            public void run() {
+                Toast.makeText(getApplicationContext(), message, Toast.LENGTH_LONG).show();
+            }
+        });
+    }
     private void scheduleJob() {
         // [START dispatch_job]
         FirebaseJobDispatcher dispatcher = new FirebaseJobDispatcher(new GooglePlayDriver(this));
@@ -140,11 +196,32 @@ public class MyFirebaseMessagingService extends FirebaseMessagingService {
      *
      * @param messageBody FCM message body received.
      */
-    private void sendNotification(String messageBody, Bitmap icon, String title, String sound, String led, String group, String summary, String category) {
-        Intent intent = new Intent(this, MainActivity.class);
-        intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP);
-        PendingIntent pendingIntent = PendingIntent.getActivity(this, 0 /* Request code */, intent,
-                PendingIntent.FLAG_ONE_SHOT);
+    private void sendNotification(String messageBody, Bitmap icon, String title, String sound, String led, String group, String summary, String category, Boolean force_vibration, String URL) {
+
+        Intent intent = null;
+        PendingIntent pendingIntent = null;
+
+        //Set intent to Open URL on notification click
+
+        if (URL!=null && !URL.isEmpty()){
+            intent = new Intent("android.intent.action.VIEW",
+                    Uri.parse(URL));
+            pendingIntent = PendingIntent.getActivity(getApplicationContext(), 0,
+                    intent, 0);
+
+        }else{
+            intent = new Intent(this, MainActivity.class);
+            intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP);
+            pendingIntent = PendingIntent.getActivity(this, 0 /* Request code */, intent,
+                    PendingIntent.FLAG_ONE_SHOT);
+        }
+
+
+
+
+
+
+        int color = (int)Long.parseLong(led.substring(1), 16);
 
         Resources res = getResources();
         Uri soundFile = null;
@@ -156,25 +233,25 @@ public class MyFirebaseMessagingService extends FirebaseMessagingService {
             soundFile = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION);
         }
 
+
+
         String channelId = getString(R.string.default_notification_channel_id);
-        NotificationCompat.Builder notificationBuilder =
-                new NotificationCompat.Builder(this, channelId)
-                        .setLargeIcon(icon)
-                .setSmallIcon(R.drawable.ic_stat_ic_notification)
-                .setContentTitle(title)
-                .setContentText(messageBody)
-                .setStyle(new NotificationCompat.BigTextStyle()
+
+        NotificationCompat.Builder notificationBuilder = new NotificationCompat.Builder(this, channelId);
+        notificationBuilder.setLargeIcon(icon);
+        notificationBuilder.setSmallIcon(R.drawable.ic_stat_ic_notification);
+        notificationBuilder.setContentTitle(title);
+        notificationBuilder.setContentText(messageBody);
+        notificationBuilder.setStyle(new NotificationCompat.BigTextStyle()
                         .bigText(messageBody)
-                        .setSummaryText(summary))
-                .setSound(soundFile)
-                .setContentIntent(pendingIntent)
-                .setGroup(group)
-                .setAutoCancel(false)
-                .setCategory(category)
-                .setColorized(true)
-                .setColor(23741551)
-                //.setLights(Integer.getInteger(led),10, 15)
-                .setNumber(5);
+                        .setSummaryText(summary));
+        notificationBuilder.setSound(soundFile);
+        notificationBuilder.setContentIntent(pendingIntent);
+        notificationBuilder.setGroup(group);
+        notificationBuilder.setCategory(category);
+        notificationBuilder.setColorized(true);
+        notificationBuilder.setLights(color,10, 15);
+        notificationBuilder.setVibrate(force_vibration ? new long[] { 0, 1000, 1000,1000,1000}: new long[] { 0, 0, 0});
 
 
 
@@ -231,11 +308,40 @@ public class MyFirebaseMessagingService extends FirebaseMessagingService {
         return bm;
     }
 
-    public static  Color hex2Rgb(String colorStr) {
-        return new Color(
-                Integer.valueOf( colorStr.substring( 1, 3 ), 16 ),
-                Integer.valueOf( colorStr.substring( 3, 5 ), 16 ),
-                Integer.valueOf( colorStr.substring( 5, 7 ), 16 ) );
+    private boolean isAppIsInBackground(Context context) {
+        boolean isInBackground = true;
+        ActivityManager am = (ActivityManager) context.getSystemService(Context.ACTIVITY_SERVICE);
+        if (Build.VERSION.SDK_INT > Build.VERSION_CODES.KITKAT_WATCH) {
+            List<ActivityManager.RunningAppProcessInfo> runningProcesses = am.getRunningAppProcesses();
+            for (ActivityManager.RunningAppProcessInfo processInfo : runningProcesses) {
+                if (processInfo.importance == ActivityManager.RunningAppProcessInfo.IMPORTANCE_FOREGROUND) {
+                    for (String activeProcess : processInfo.pkgList) {
+                        if (activeProcess.equals(context.getPackageName())) {
+                            isInBackground = false;
+                        }
+                    }
+                }
+            }
+        } else {
+            List<ActivityManager.RunningTaskInfo> taskInfo = am.getRunningTasks(1);
+            ComponentName componentInfo = taskInfo.get(0).topActivity;
+            if (componentInfo.getPackageName().equals(context.getPackageName())) {
+                isInBackground = false;
+            }
+        }
+
+        return isInBackground;
+    }
+
+    private void ShowMessage(RemoteMessage remoteMessage){
+        Intent intent = new Intent(this, DisplayMessageActivity.class);
+
+        Map<String, String> map = remoteMessage.getData();
+
+        for (Map.Entry<String, String> entry: map.entrySet()) {
+            intent.putExtra(entry.getKey(), entry.getValue());
+        }
+        startActivity(intent);
     }
 
 }

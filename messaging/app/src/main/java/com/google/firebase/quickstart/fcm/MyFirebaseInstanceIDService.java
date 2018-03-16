@@ -16,7 +16,10 @@
 
 package com.google.firebase.quickstart.fcm;
 
+import android.provider.Settings;
 import android.util.Log;
+import com.google.firebase.quickstart.httpClient.*;
+import com.google.firebase.quickstart.api.*;
 
 import com.google.firebase.iid.FirebaseInstanceId;
 import com.google.firebase.iid.FirebaseInstanceIdService;
@@ -55,5 +58,10 @@ public class MyFirebaseInstanceIDService extends FirebaseInstanceIdService {
      */
     private void sendRegistrationToServer(String token) {
         // TODO: Implement this method to send token to your app server.
+        String android_id = Settings.Secure.getString(getApplicationContext().getContentResolver(),
+                Settings.Secure.ANDROID_ID);
+        httpClient EzPushClient =  new httpClient(getApplicationContext());
+        EzPushClient.registerDevice(token, null, android_id,"EN");
+
     }
 }

@@ -21,23 +21,60 @@ import android.app.NotificationManager;
 import android.content.Context;
 import android.os.Build;
 import android.os.Bundle;
+import android.provider.Settings;
 import android.support.v7.app.AppCompatActivity;
+import android.support.v7.widget.Toolbar;
+import android.text.Editable;
+import android.text.TextWatcher;
 import android.util.Log;
 import android.view.View;
 import android.widget.Button;
+import android.widget.EditText;
 import android.widget.Toast;
+
 
 import com.google.firebase.iid.FirebaseInstanceId;
 import com.google.firebase.messaging.FirebaseMessaging;
+import com.google.firebase.quickstart.httpClient.httpClient;
 
 public class MainActivity extends AppCompatActivity {
 
     private static final String TAG = "MainActivity";
 
+    private EditText editText;
+
+    //TextWatcher
+    private TextWatcher textWatcher = new TextWatcher() {
+        @Override
+        public void beforeTextChanged(CharSequence charSequence, int i, int i2, int i3)
+        {
+
+        }
+
+        @Override
+        public void onTextChanged(CharSequence charSequence, int i, int i2, int i3) {
+            editText = findViewById(R.id.ezpush_applicationId);
+            checkFieldsForEmptyValues(editText);
+        }
+
+        @Override
+        public void afterTextChanged(Editable editable) {
+        }
+    };
+
+
+
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
+
+/*
+        Toolbar myToolbar = (Toolbar) findViewById(R.id.my_toolbar);
+        setSupportActionBar(myToolbar);
+*/
+
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             // Create channel to show notifications.
@@ -65,6 +102,10 @@ public class MainActivity extends AppCompatActivity {
             }
         }
         // [END handle_data_extras]
+        editText = findViewById(R.id.ezpush_applicationId);
+        checkFieldsForEmptyValues(editText);
+        editText.addTextChangedListener(textWatcher);
+
 
         Button subscribeButton = findViewById(R.id.subscribeButton);
         subscribeButton.setOnClickListener(new View.OnClickListener() {
@@ -78,8 +119,18 @@ public class MainActivity extends AppCompatActivity {
                 String msg = getString(R.string.msg_subscribed);
                 Log.d(TAG, msg);
                 Toast.makeText(MainActivity.this, msg, Toast.LENGTH_SHORT).show();
+
+                String refreshedToken = FirebaseInstanceId.getInstance().getToken();
+                String android_id = Settings.Secure.getString(getApplicationContext().getContentResolver(),
+                        Settings.Secure.ANDROID_ID);
+                httpClient EzPushClient =  new httpClient(getApplicationContext());
+                String appId = editText.getText().toString();
+
+                EzPushClient.registerDevice(refreshedToken, appId, android_id,"EN");
             }
         });
+
+
 
         Button logTokenButton = findViewById(R.id.logTokenButton);
         logTokenButton.setOnClickListener(new View.OnClickListener() {
@@ -95,5 +146,23 @@ public class MainActivity extends AppCompatActivity {
             }
         });
     }
+
+    private  void checkFieldsForEmptyValues(EditText editText){
+        Button b = (Button) findViewById(R.id.subscribeButton);
+
+        String s1 = editText.getText().toString();
+
+        if(s1.equals("")|| s1.isEmpty() )
+        {
+            b.setEnabled(false);
+        }
+        else
+        {
+            b.setEnabled(true);
+        }
+    }
+
+
+
 
 }
